@@ -3,10 +3,30 @@ export {};
 const canvas = document.querySelector<HTMLCanvasElement>("#rover-canvas")!;
 const ctx = canvas.getContext("2d")!;
 const readout = document.querySelector<HTMLParagraphElement>("#rover-readout")!;
-const headings = ["North", "East", "South", "West"];
 let x = 2;
 let y = 2;
 let direction = 0;
+
+// --- Compass -----------------------------------------------------------
+// Ordered clockwise, so turning right means moving to the next record.
+// Each record carries its name and how one step changes the position.
+type Direction = {
+  name: string;
+  dx: number;
+  dy: number;
+};
+
+const compass: Direction[] = [
+  { name: "North", dx: 0, dy: -1 },
+  { name: "East", dx: 1, dy: 0 },
+  { name: "South", dx: 0, dy: 1 },
+  { name: "West", dx: -1, dy: 0 },
+];
+
+// --- Movement rule -----------------------------------------------------
+function clampToGrid(value: number): number {
+  return Math.max(0, Math.min(4, value));
+}
 
 // --- Commands ----------------------------------------------------------
 // A command knows how to carry itself out. The label is for display only;
@@ -19,17 +39,16 @@ type Command = {
 const forward: Command = {
   label: "Forward",
   execute: () => {
-    if (direction === 0) y = Math.max(0, y - 1);
-    if (direction === 1) x = Math.min(4, x + 1);
-    if (direction === 2) y = Math.min(4, y + 1);
-    if (direction === 3) x = Math.max(0, x - 1);
+    const heading = compass[direction];
+    x = clampToGrid(x + heading.dx);
+    y = clampToGrid(y + heading.dy);
   },
 };
 
 const turnRight: Command = {
   label: "Right",
   execute: () => {
-    direction = (direction + 1) % 4;
+    direction = (direction + 1) % compass.length;
   },
 };
 
@@ -60,7 +79,7 @@ function drawRover() {
   ctx.fill();
   ctx.restore();
   readout.textContent = `Position: (${x}, ${y}) · Facing: ${
-    headings[direction]
+    compass[direction].name
   }`;
 }
 
