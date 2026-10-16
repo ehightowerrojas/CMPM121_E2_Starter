@@ -21,6 +21,8 @@ const memberTileSize = 36;
 const memberTileSpacing = 45;
 const barPixelsPerSupply = 14;
 const leftMargin = 18;
+const firstSupplyRowY = 102;
+const supplyRowSpacing = 52;
 
 // --- DOM ---------------------------------------------------------------
 const canvas = document.querySelector<HTMLCanvasElement>("#allocation-canvas")!;
@@ -60,6 +62,29 @@ function calculateShift(producers: number): ShiftResult {
   };
 }
 
+// --- Supply report rows ------------------------------------------------
+// Each row says what to show and how to color it. The amount is read
+// from the calculated shift, so the provisioning rules live only in
+// calculateShift(). Order in this list decides vertical position.
+type SupplyRow = {
+  label: string;
+  amountFrom: (shift: ShiftResult) => number;
+  barColor: string;
+};
+
+const supplyRows: SupplyRow[] = [
+  {
+    label: "Production",
+    amountFrom: (shift) => shift.produced,
+    barColor: colors.producer,
+  },
+  {
+    label: "Consumption",
+    amountFrom: (shift) => shift.needed,
+    barColor: colors.need,
+  },
+];
+
 // --- Canvas renderer ---------------------------------------------------
 function drawCommunityMembers(shift: ShiftResult): void {
   ctx.font = "16px system-ui";
@@ -73,16 +98,15 @@ function drawCommunityMembers(shift: ShiftResult): void {
   }
 }
 
-function drawSupplyBar(
-  label: string,
-  amount: number,
-  labelY: number,
-  barColor: string,
-): void {
-  ctx.fillStyle = colors.text;
-  ctx.fillText(`${label}: ${amount}`, leftMargin, labelY);
-  ctx.fillStyle = barColor;
-  ctx.fillRect(leftMargin, labelY + 8, amount * barPixelsPerSupply, 20);
+function drawSupplyRows(shift: ShiftResult): void {
+  supplyRows.forEach((row, index) => {
+    const labelY = firstSupplyRowY + index * supplyRowSpacing;
+    const amount = row.amountFrom(shift);
+    ctx.fillStyle = colors.text;
+    ctx.fillText(`${row.label}: ${amount}`, leftMargin, labelY);
+    ctx.fillStyle = row.barColor;
+    ctx.fillRect(leftMargin, labelY + 8, amount * barPixelsPerSupply, 20);
+  });
 }
 
 function drawShift(shift: ShiftResult): void {
@@ -96,8 +120,7 @@ function drawShift(shift: ShiftResult): void {
     leftMargin,
     76,
   );
-  drawSupplyBar("Production", shift.produced, 102, colors.producer);
-  drawSupplyBar("Consumption", shift.needed, 154, colors.need);
+  drawSupplyRows(shift);
 }
 
 // --- Readout renderer --------------------------------------------------
