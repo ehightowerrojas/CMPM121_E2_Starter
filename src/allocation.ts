@@ -31,7 +31,15 @@ const readout = document.querySelector<HTMLParagraphElement>(
 
 let producerCount = initialProducerCount;
 
-// --- Pure calculations -------------------------------------------------
+// --- Shift calculation (no DOM, no canvas) -----------------------------
+type ShiftResult = {
+  producers: number;
+  communitySize: number;
+  produced: number;
+  needed: number;
+  balance: number;
+};
+
 function suppliesProduced(producers: number): number {
   return producers * suppliesPerProducer;
 }
@@ -40,15 +48,23 @@ function communityNeed(): number {
   return communitySize * suppliesNeededPerMember;
 }
 
-function formatSigned(value: number): string {
-  return `${value > 0 ? "+" : ""}${value}`;
+function calculateShift(producers: number): ShiftResult {
+  const produced = suppliesProduced(producers);
+  const needed = communityNeed();
+  return {
+    producers,
+    communitySize,
+    produced,
+    needed,
+    balance: produced - needed,
+  };
 }
 
-// --- Rendering ---------------------------------------------------------
-function drawCommunityMembers(producers: number): void {
+// --- Canvas renderer ---------------------------------------------------
+function drawCommunityMembers(shift: ShiftResult): void {
   ctx.font = "16px system-ui";
-  for (let member = 0; member < communitySize; member++) {
-    const isProducing = member < producers;
+  for (let member = 0; member < shift.communitySize; member++) {
+    const isProducing = member < shift.producers;
     const x = leftMargin + member * memberTileSpacing;
     ctx.fillStyle = isProducing ? colors.producer : colors.member;
     ctx.fillRect(x, 16, memberTileSize, memberTileSize);
@@ -69,27 +85,38 @@ function drawSupplyBar(
   ctx.fillRect(leftMargin, labelY + 8, amount * barPixelsPerSupply, 20);
 }
 
-function render(): void {
-  const produced = suppliesProduced(producerCount);
-  const needed = communityNeed();
-  const balance = produced - needed;
-
+function drawShift(shift: ShiftResult): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawCommunityMembers(producerCount);
+  drawCommunityMembers(shift);
 
   ctx.font = "14px system-ui";
   ctx.fillStyle = colors.text;
   ctx.fillText(
-    `Producers: ${producerCount} / ${communitySize}`,
+    `Producers: ${shift.producers} / ${shift.communitySize}`,
     leftMargin,
     76,
   );
-  drawSupplyBar("Production", produced, 102, colors.producer);
-  drawSupplyBar("Consumption", needed, 154, colors.need);
+  drawSupplyBar("Production", shift.produced, 102, colors.producer);
+  drawSupplyBar("Consumption", shift.needed, 154, colors.need);
+}
 
+// --- Readout renderer --------------------------------------------------
+function formatSigned(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}`;
+}
+
+function writeReadout(shift: ShiftResult): void {
   readout.textContent =
-    `Assigned: ${producerCount}/${communitySize} · Production: ${produced} · ` +
-    `Consumption: ${needed} · Balance: ${formatSigned(balance)}`;
+    `Assigned: ${shift.producers}/${shift.communitySize} · ` +
+    `Production: ${shift.produced} · Consumption: ${shift.needed} · ` +
+    `Balance: ${formatSigned(shift.balance)}`;
+}
+
+// --- Update cycle ------------------------------------------------------
+function render(): void {
+  const shift = calculateShift(producerCount);
+  drawShift(shift);
+  writeReadout(shift);
 }
 
 // --- Controls ----------------------------------------------------------
