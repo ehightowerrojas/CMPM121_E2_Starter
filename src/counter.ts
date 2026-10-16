@@ -56,16 +56,34 @@ function drawMeter(shield: ShieldSnapshot): void {
 }
 
 // --- Inspector view ----------------------------------------------------
-function updateStats(shield: ShieldSnapshot): void {
-  panelUpdates++;
-  diagnostic.textContent = `Inspector deliveries: ${panelUpdates}`;
-  renderStats(shield);
-}
-
 function renderStats(shield: ShieldSnapshot): void {
   if (!panel) return;
   panel.textContent =
     `Shield charge: ${shield.charge} · Missing charge: ${shield.missing}`;
+}
+
+// Named so the same reference can be removed on close. Counts every
+// delivery it receives, panel or not, so a leaked subscription would
+// show up in the diagnostic.
+function onInspectorDelivery(event: Event): void {
+  panelUpdates++;
+  diagnostic.textContent = `Inspector deliveries: ${panelUpdates}`;
+  renderStats((event as ShieldChangedEvent).detail);
+}
+
+function openInspector(): void {
+  if (panel) return;
+  panel = document.createElement("p");
+  host.append(panel);
+  renderStats(takeShieldSnapshot(count));
+  shieldEvents.addEventListener(shieldChanged, onInspectorDelivery);
+}
+
+function closeInspector(): void {
+  if (!panel) return;
+  shieldEvents.removeEventListener(shieldChanged, onInspectorDelivery);
+  panel.remove();
+  panel = null;
 }
 
 // --- State changes -----------------------------------------------------
@@ -73,9 +91,7 @@ function setCount(next: number) {
   const bounded = Math.max(0, Math.min(shieldCapacity, next));
   if (bounded === count) return;
   count = bounded;
-  const shield = takeShieldSnapshot(count);
-  announceShieldChange(shield);
-  if (panel) updateStats(shield);
+  announceShieldChange(takeShieldSnapshot(count));
 }
 
 // --- Display wiring ----------------------------------------------------
@@ -93,15 +109,8 @@ document.querySelector<HTMLButtonElement>("#counter-more")!.onclick = () => {
 document.querySelector<HTMLButtonElement>("#counter-reset")!.onclick = () => {
   setCount(0);
 };
-document.querySelector<HTMLButtonElement>("#counter-open")!.onclick = () => {
-  if (panel) return;
-  panel = document.createElement("p");
-  host.append(panel);
-  renderStats(takeShieldSnapshot(count));
-};
-document.querySelector<HTMLButtonElement>("#counter-close")!.onclick = () => {
-  if (!panel) return;
-  panel.remove();
-  panel = null;
-};
+document.querySelector<HTMLButtonElement>("#counter-open")!.onclick =
+  openInspector;
+document.querySelector<HTMLButtonElement>("#counter-close")!.onclick =
+  closeInspector;
 drawMeter(takeShieldSnapshot(count));
