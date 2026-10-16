@@ -9,41 +9,63 @@ const host = document.querySelector<HTMLDivElement>("#counter-panel-host")!;
 const diagnostic = document.querySelector<HTMLParagraphElement>(
   "#counter-diagnostic",
 )!;
+const shieldCapacity = 10;
 let count = 0;
 let panel: HTMLParagraphElement | null = null;
 let panelUpdates = 0;
 
-function drawMeter() {
+// --- Shield snapshot (no DOM, no canvas) -------------------------------
+type ShieldSnapshot = {
+  charge: number;
+  capacity: number;
+  missing: number;
+};
+
+function takeShieldSnapshot(charge: number): ShieldSnapshot {
+  return {
+    charge,
+    capacity: shieldCapacity,
+    missing: shieldCapacity - charge,
+  };
+}
+
+// --- HUD view ----------------------------------------------------------
+function drawMeter(shield: ShieldSnapshot): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < 10; i++) {
-    ctx.fillStyle = i < count ? "#27766b" : "#c9d2c9";
+  for (let i = 0; i < shield.capacity; i++) {
+    ctx.fillStyle = i < shield.charge ? "#27766b" : "#c9d2c9";
     ctx.fillRect(12 + i * 28, 24, 24, 48);
   }
   ctx.fillStyle = "#233e43";
   ctx.font = "16px system-ui";
-  ctx.fillText(`${count} / 10 shield`, 12, 100);
-  readout.textContent = `Shield charge: ${count} / 10`;
+  ctx.fillText(`${shield.charge} / ${shield.capacity} shield`, 12, 100);
+  readout.textContent = `Shield charge: ${shield.charge} / ${shield.capacity}`;
 }
 
-function updateStats() {
+// --- Inspector view ----------------------------------------------------
+function updateStats(shield: ShieldSnapshot): void {
   panelUpdates++;
   diagnostic.textContent = `Inspector deliveries: ${panelUpdates}`;
-  renderStats();
+  renderStats(shield);
 }
 
-function renderStats() {
+function renderStats(shield: ShieldSnapshot): void {
   if (!panel) return;
-  panel.textContent = `Shield charge: ${count} · Missing charge: ${10 - count}`;
+  panel.textContent =
+    `Shield charge: ${shield.charge} · Missing charge: ${shield.missing}`;
 }
 
+// --- State changes -----------------------------------------------------
 function setCount(next: number) {
-  const bounded = Math.max(0, Math.min(10, next));
+  const bounded = Math.max(0, Math.min(shieldCapacity, next));
   if (bounded === count) return;
   count = bounded;
-  drawMeter();
-  if (panel) updateStats();
+  const shield = takeShieldSnapshot(count);
+  drawMeter(shield);
+  if (panel) updateStats(shield);
 }
 
+// --- Controls ----------------------------------------------------------
 document.querySelector<HTMLButtonElement>("#counter-less")!.onclick = () => {
   setCount(count - 1);
 };
@@ -57,11 +79,11 @@ document.querySelector<HTMLButtonElement>("#counter-open")!.onclick = () => {
   if (panel) return;
   panel = document.createElement("p");
   host.append(panel);
-  renderStats();
+  renderStats(takeShieldSnapshot(count));
 };
 document.querySelector<HTMLButtonElement>("#counter-close")!.onclick = () => {
   if (!panel) return;
   panel.remove();
   panel = null;
 };
-drawMeter();
+drawMeter(takeShieldSnapshot(count));
