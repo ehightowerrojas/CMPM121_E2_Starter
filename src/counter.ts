@@ -29,6 +29,19 @@ function takeShieldSnapshot(charge: number): ShieldSnapshot {
   };
 }
 
+// --- Change announcements ----------------------------------------------
+// Fired after the charge has actually changed. The event carries the
+// snapshot so listeners never read the global count themselves.
+const shieldChanged = "shield-changed";
+type ShieldChangedEvent = CustomEvent<ShieldSnapshot>;
+const shieldEvents = new EventTarget();
+
+function announceShieldChange(shield: ShieldSnapshot): void {
+  shieldEvents.dispatchEvent(
+    new CustomEvent<ShieldSnapshot>(shieldChanged, { detail: shield }),
+  );
+}
+
 // --- HUD view ----------------------------------------------------------
 function drawMeter(shield: ShieldSnapshot): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -61,9 +74,14 @@ function setCount(next: number) {
   if (bounded === count) return;
   count = bounded;
   const shield = takeShieldSnapshot(count);
-  drawMeter(shield);
+  announceShieldChange(shield);
   if (panel) updateStats(shield);
 }
+
+// --- Display wiring ----------------------------------------------------
+shieldEvents.addEventListener(shieldChanged, (event) => {
+  drawMeter((event as ShieldChangedEvent).detail);
+});
 
 // --- Controls ----------------------------------------------------------
 document.querySelector<HTMLButtonElement>("#counter-less")!.onclick = () => {
